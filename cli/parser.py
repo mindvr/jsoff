@@ -53,6 +53,45 @@ def parse_short_paths(element: Any, parent: List[str], unique_paths: Set[str], s
     else:
         statistic[path].add_value(element)
 
+def find_pk_fields(parent_stats: Dict[str, Dict]) -> List[str]:
+    pk_fields = []
+    for field, stats in parent_stats.items():
+        if (float(stats['ratio']) == 100.0 and
+            stats['count'] > 1):
+            pk_fields.append((field, stats['count']))
+
+    # Sort desc by count
+    pk_fields.sort(key=lambda x: x[1], reverse=True)
+    return [field for field, _ in pk_fields]
+
+def get_all_fields(parent_stats: Dict[str, Dict], pk_fields: List[str]) -> List[str]:
+    # Start with PK fields
+    all_fields = pk_fields.copy()
+
+    # Add remaining fields alphabetically
+    remaining = sorted(set(parent_stats.keys()) - set(pk_fields))
+    all_fields.extend(remaining)
+
+    return all_fields
+
+def transform_statistics(statistic: Dict[str, Stat]) -> Dict[str, Dict]:
+    # First, group by parent
+    transformed = defaultdict(dict)
+    for path, stat in statistic.items():
+        if '.' in path:
+            parent, prop = path.rsplit('.', 1)
+            transformed[parent][prop] = stat.to_dict()
+
+    # Then add pk and fields
+    result = {}
+    for parent, stats in transformed.items():
+        result[parent] = {
+            'pk': find_pk_fields(stats),
+            'fields': get_all_fields(stats, find_pk_fields(stats)),
+            'stats': stats
+        }
+
+    return result
 
 def main(input_file: str, output_file: str = None):
     data = load_json_file(input_file)
@@ -60,11 +99,7 @@ def main(input_file: str, output_file: str = None):
     statistic = defaultdict(Stat)
     parse_short_paths(data, ['root'], paths, statistic)
 
-    transformed = defaultdict(dict)
-    for path, stat in statistic.items():
-        if '.' in path:
-            parent, prop = path.rsplit('.', 1)
-            transformed[parent][prop] = stat.to_dict()
+    transformed = transform_statistics(statistic)
 
     if output_file:
         with open(output_file, 'w') as f:
@@ -78,4 +113,4 @@ if __name__ == '__main__':
     elif len(sys.argv) > 1:
         main(sys.argv[1])
     else:
-        main("sample2.json", "stat2.json")
+        main("sample2.json")
