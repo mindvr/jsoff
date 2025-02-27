@@ -31,7 +31,7 @@ def sort_list(element: List[Any], keys: List[str]) -> List[Any]:
         else:
             primitives.append(item)
     for key in reversed(keys):
-        dicts.sort(key=lambda x: x.get(key, None))
+        dicts.sort(key=lambda x: x.get(key, ''))
     primitives.sort()
     return dicts + primitives + lists
 
